@@ -1,7 +1,14 @@
+# -*- coding: utf-8 -*-
 #BEGIN_HEADER
 from doekbase.data_api.annotation.genome_annotation.api import GenomeAnnotationAPI as GenomeAnnotationAPI_local
 from doekbase.data_api import cache
 import logging
+
+# temporary import of ws for widget hack
+import os
+from biokbase.workspace.client import Workspace
+from pprint import pprint
+
 #END_HEADER
 
 
@@ -21,8 +28,8 @@ class GenomeAnnotationAPI:
     # the latter method is running.
     #########################################
     VERSION = "0.0.2"
-    GIT_URL = "https://github.com/mlhenderson/genome_annotation_api"
-    GIT_COMMIT_HASH = "d1d0b635a24d5bfee6c5d53ad77e2903a5ebb252"
+    GIT_URL = "git@github.com:msneddon/genome_annotation_api"
+    GIT_COMMIT_HASH = "bda135f9a2ebd11c588b9f7a71e346f153b7cd93"
     
     #BEGIN_CLASS_HEADER
     #END_CLASS_HEADER
@@ -31,6 +38,8 @@ class GenomeAnnotationAPI:
     # be found
     def __init__(self, config):
         #BEGIN_CONSTRUCTOR
+        self.workspaceURL = config['workspace-url']
+
         self.logger = logging.getLogger()
         log_handler = logging.StreamHandler()
         log_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
@@ -696,6 +705,135 @@ class GenomeAnnotationAPI:
                              'returnVal is not type int as required.')
         # return the results
         return [returnVal]
+
+    def get_feature_info_hack_for_widget(self, ctx, params):
+        """
+        does not work for old genome types!  only a hack for testing widgets in the Narrative
+        for new GenomeAnnotation objects
+        :param params: instance of type "GetFeatureInfoHack" (type is the
+           list of types requested.  if null or empty, all types are
+           returned) -> structure: parameter "ref" of type "ObjectReference",
+           parameter "types" of list of String
+        :returns: instance of type "GetFeatureInfoHackResult" -> structure:
+           parameter "features" of list of type "Feature_data" -> structure:
+           parameter "feature_id" of String, parameter "feature_type" of
+           String, parameter "feature_function" of String, parameter
+           "feature_aliases" of mapping from String to list of String,
+           parameter "feature_dna_sequence_length" of Long, parameter
+           "feature_dna_sequence" of String, parameter "feature_md5" of
+           String, parameter "feature_locations" of list of type "Region" ->
+           structure: parameter "contig_id" of String, parameter "strand" of
+           String, parameter "start" of Long, parameter "length" of Long,
+           parameter "feature_publications" of list of String, parameter
+           "feature_quality_warnings" of list of String, parameter
+           "feature_quality_score" of list of String, parameter
+           "feature_notes" of String, parameter "feature_inference" of String
+        """
+        # ctx is the context object
+        # return variables are: res
+        #BEGIN get_feature_info_hack_for_widget
+
+        ws = Workspace(self.workspaceURL, token = ctx['token'])
+
+        # New parameters for get_objects2
+        # typedef structure {
+        #     ws_name workspace;
+        #     ws_id wsid;
+        #     obj_name name;
+        #     obj_id objid;
+        #     obj_ver ver;
+        #     obj_ref ref;
+        #     ref_chain obj_path;
+        #     list<obj_ref> obj_ref_path;
+        #     list<object_path> included;
+        #     boolean strict_maps;
+        #     boolean strict_arrays;
+        # } ObjectSpecification;
+
+        # figure out where all the feature containers are
+        gaData = ws.get_objects2({
+                            'objects': [
+                                {
+                                    'ref':       params['ref'],
+                                    'included':  ['feature_container_references']
+                                }
+                            ]})['data'][0]
+        featureContainers = gaData['data']['feature_container_references']
+        gaInfo = gaData['info']
+
+        pprint(gaInfo)
+        pprint(featureContainers)
+
+
+        # feature types filter
+        types = None
+        if 'types' in params and len(params['types'])>0:
+            types = params['types']
+
+        # see: https://narrative-ci.kbase.us/#spec/type/KBaseGenomeAnnotations.FeatureContainer-2.0
+        included = [
+            '/features/*/feature_id',
+            '/features/*/locations',
+            '/features/*/type',
+            '/features/*/function',
+            '/features/*/md5',
+            '/features/*/dna_sequence_length',
+            '/features/*/aliases',
+            '/features/*/notes',
+            '/features/*/feature_quality',
+            '/features/*/quality_warnings',
+        ]
+
+        # Return data fields
+        # string feature_id;
+        # string feature_type;
+        # string feature_function;
+        # mapping<string, list<string>> feature_aliases;
+        # int feature_dna_sequence_length;
+        # string feature_dna_sequence;
+        # string feature_md5;
+        # list<Region> feature_locations;
+        # list<string> feature_publications;
+        # list<string> feature_quality_warnings;
+        # list<string> feature_quality_score;
+        # string feature_notes;
+        # string feature_inference;
+
+        all_features = []
+        for fc in featureContainers:
+            if types is not None:
+                if fc not in types:
+                    continue
+
+            # Note: could lump these all in one bulk get_objects2 call
+            fc_ws_id = featureContainers[fc]
+            features = ws.get_objects2({ 'objects': [
+                            {
+                                'ref':str(gaInfo[6]) + '/' + str(gaInfo[0]) + '/' + str(gaInfo[4]),
+                                'included':included, 
+                                'obj_ref_path':[ fc_ws_id ]
+                            }
+                            ]})['data'][0]['data']['features']
+            for f in features:
+                fdata = features[f]
+                # have to match key to return object
+                for key in fdata:
+                    if key != 'feature_id':
+                        fdata['feature_'+key] =fdata[key]
+                        del(fdata[key])
+
+                all_features.append(fdata)
+
+        res = { 'features': all_features }
+
+        #END get_feature_info_hack_for_widget
+
+        # At some point might do deeper type checking...
+        if not isinstance(res, dict):
+            raise ValueError('Method get_feature_info_hack_for_widget return value ' +
+                             'res is not type dict as required.')
+        # return the results
+        return [res]
 
     def status(self, ctx):
         #BEGIN_STATUS

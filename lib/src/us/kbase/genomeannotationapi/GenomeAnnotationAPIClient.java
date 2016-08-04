@@ -53,6 +53,20 @@ public class GenomeAnnotationAPIClient {
         caller = new JsonClientCaller(url, user, password);
     }
 
+    /** Constructs a client with a custom URL
+     * and a custom authorization service URL.
+     * @param url the URL of the service.
+     * @param user the user name.
+     * @param password the password for the user name.
+     * @param auth the URL of the authorization server.
+     * @throws UnauthorizedException if the credentials are not valid.
+     * @throws IOException if an IOException occurs when checking the user's
+     * credentials.
+     */
+    public GenomeAnnotationAPIClient(URL url, String user, String password, URL auth) throws UnauthorizedException, IOException {
+        caller = new JsonClientCaller(url, user, password, auth);
+    }
+
     /** Get the token this client uses to communicate with the server.
      * @return the authorization token.
      */
@@ -468,7 +482,7 @@ public class GenomeAnnotationAPIClient {
      * *
      * * Retrieves coding sequence Features (cds) for given gene Feature IDs.
      * *
-     * * @param feature_id_list List of gene Feature IDS for which to retrieve CDS.
+     * * @param gene_id_list List of gene Feature IDS for which to retrieve CDS.
      * *     If empty, returns data for all features.
      * * @return Mapping of gene Feature IDs to a list of CDS Feature IDs.
      * </pre>
@@ -493,7 +507,7 @@ public class GenomeAnnotationAPIClient {
      * *
      * * Retrieves coding sequence (cds) Feature IDs for given mRNA Feature IDs.
      * *
-     * * @param feature_id_list List of mRNA Feature IDS for which to retrieve CDS.
+     * * @param mrna_id_list List of mRNA Feature IDS for which to retrieve CDS.
      * *     If empty, returns data for all features.
      * * @return Mapping of mRNA Feature IDs to a list of CDS Feature IDs.
      * </pre>
@@ -518,7 +532,7 @@ public class GenomeAnnotationAPIClient {
      * *
      * * Retrieves gene Feature IDs for given coding sequence (cds) Feature IDs.
      * *
-     * * @param feature_id_list List of cds Feature IDS for which to retrieve gene IDs.
+     * * @param cds_id_list List of cds Feature IDS for which to retrieve gene IDs.
      * *     If empty, returns all cds/gene mappings.
      * * @return Mapping of cds Feature IDs to gene Feature IDs.
      * </pre>
@@ -543,7 +557,7 @@ public class GenomeAnnotationAPIClient {
      * *
      * * Retrieves gene Feature IDs for given mRNA Feature IDs.
      * *
-     * * @param feature_id_list List of mRNA Feature IDS for which to retrieve gene IDs.
+     * * @param mrna_id_list List of mRNA Feature IDS for which to retrieve gene IDs.
      * *     If empty, returns all mRNA/gene mappings.
      * * @return Mapping of mRNA Feature IDs to gene Feature IDs.
      * </pre>
@@ -568,7 +582,7 @@ public class GenomeAnnotationAPIClient {
      * *
      * * Retrieves mRNA Features for given coding sequences (cds) Feature IDs.
      * *
-     * * @param feature_id_list List of cds Feature IDS for which to retrieve mRNA IDs.
+     * * @param cds_id_list List of cds Feature IDS for which to retrieve mRNA IDs.
      * *     If empty, returns all cds/mRNA mappings.
      * * @return Mapping of cds Feature IDs to mRNA Feature IDs.
      * </pre>
@@ -593,7 +607,7 @@ public class GenomeAnnotationAPIClient {
      * *
      * * Retrieve the mRNA IDs for given gene IDs.
      * *
-     * * @param feature_id_list List of gene Feature IDS for which to retrieve mRNA IDs.
+     * * @param gene_id_list List of gene Feature IDS for which to retrieve mRNA IDs.
      * *     If empty, returns all gene/mRNA mappings.
      * * @return Mapping of gene Feature IDs to a list of mRNA Feature IDs.
      * </pre>
@@ -618,7 +632,7 @@ public class GenomeAnnotationAPIClient {
      * *
      * * Retrieve Exon information for each mRNA ID.
      * *
-     * * @param feature_id_list List of mRNA Feature IDS for which to retrieve exons.
+     * * @param mrna_id_list List of mRNA Feature IDS for which to retrieve exons.
      * *     If empty, returns data for all exons.
      * * @return Mapping of mRNA Feature IDs to a list of exons (:js:data:`Exon_data`).
      * </pre>
@@ -672,6 +686,74 @@ public class GenomeAnnotationAPIClient {
         args.add(mrnaIdList);
         TypeReference<List<Map<String,Map<String,UTRData>>>> retType = new TypeReference<List<Map<String,Map<String,UTRData>>>>() {};
         List<Map<String,Map<String,UTRData>>> res = caller.jsonrpcCall("GenomeAnnotationAPI.get_mrna_utrs", args, retType, true, true, jsonRpcContext, this.serviceVersion);
+        return res.get(0);
+    }
+
+    /**
+     * <p>Original spec-file function name: get_summary</p>
+     * <pre>
+     * *
+     * * Retrieve a summary representation of this GenomeAnnotation.
+     * *
+     * * @return summary data
+     * </pre>
+     * @param   ref   instance of original type "ObjectReference"
+     * @return   instance of type {@link us.kbase.genomeannotationapi.SummaryData SummaryData} (original type "Summary_data")
+     * @throws IOException if an IO exception occurs
+     * @throws JsonClientException if a JSON RPC exception occurs
+     */
+    public SummaryData getSummary(String ref, RpcContext... jsonRpcContext) throws IOException, JsonClientException {
+        List<Object> args = new ArrayList<Object>();
+        args.add(ref);
+        TypeReference<List<SummaryData>> retType = new TypeReference<List<SummaryData>>() {};
+        List<SummaryData> res = caller.jsonrpcCall("GenomeAnnotationAPI.get_summary", args, retType, true, true, jsonRpcContext, this.serviceVersion);
+        return res.get(0);
+    }
+
+    /**
+     * <p>Original spec-file function name: save_summary</p>
+     * <pre>
+     * *
+     * * Retrieve a summary representation of this GenomeAnnotation.
+     * *
+     * * @return summary data
+     * </pre>
+     * @param   ref   instance of original type "ObjectReference"
+     * @return   instance of Long
+     * @throws IOException if an IO exception occurs
+     * @throws JsonClientException if a JSON RPC exception occurs
+     */
+    public Long saveSummary(String ref, RpcContext... jsonRpcContext) throws IOException, JsonClientException {
+        List<Object> args = new ArrayList<Object>();
+        args.add(ref);
+        TypeReference<List<Long>> retType = new TypeReference<List<Long>>() {};
+        List<Long> res = caller.jsonrpcCall("GenomeAnnotationAPI.save_summary", args, retType, true, true, jsonRpcContext, this.serviceVersion);
+        return res.get(0);
+    }
+
+    /**
+     * <p>Original spec-file function name: get_feature_info_hack_for_widget</p>
+     * <pre>
+     * does not work for old genome types!  only a hack for testing widgets in the Narrative
+     * for new GenomeAnnotation objects
+     * </pre>
+     * @param   params   instance of type {@link us.kbase.genomeannotationapi.GetFeatureInfoHack GetFeatureInfoHack}
+     * @return   parameter "res" of type {@link us.kbase.genomeannotationapi.GetFeatureInfoHackResult GetFeatureInfoHackResult}
+     * @throws IOException if an IO exception occurs
+     * @throws JsonClientException if a JSON RPC exception occurs
+     */
+    public GetFeatureInfoHackResult getFeatureInfoHackForWidget(GetFeatureInfoHack params, RpcContext... jsonRpcContext) throws IOException, JsonClientException {
+        List<Object> args = new ArrayList<Object>();
+        args.add(params);
+        TypeReference<List<GetFeatureInfoHackResult>> retType = new TypeReference<List<GetFeatureInfoHackResult>>() {};
+        List<GetFeatureInfoHackResult> res = caller.jsonrpcCall("GenomeAnnotationAPI.get_feature_info_hack_for_widget", args, retType, true, true, jsonRpcContext, this.serviceVersion);
+        return res.get(0);
+    }
+
+    public Map<String, Object> status(RpcContext... jsonRpcContext) throws IOException, JsonClientException {
+        List<Object> args = new ArrayList<Object>();
+        TypeReference<List<Map<String, Object>>> retType = new TypeReference<List<Map<String, Object>>>() {};
+        List<Map<String, Object>> res = caller.jsonrpcCall("GenomeAnnotationAPI.status", args, retType, true, false, jsonRpcContext, this.serviceVersion);
         return res.get(0);
     }
 }

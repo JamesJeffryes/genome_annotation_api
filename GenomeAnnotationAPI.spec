@@ -407,4 +407,19 @@ module GenomeAnnotationAPI {
      */
     funcdef save_summary(ObjectReference ref) returns (int) authentication required;
 
+
+    /* type is the list of types requested.  if null or empty, all types are returned */
+    typedef structure {
+        ObjectReference ref;
+        list<string> types;
+    } GetFeatureInfoHack;
+
+    typedef structure {
+        list <Feature_data> features;
+    } GetFeatureInfoHackResult;
+
+    /* does not work for old genome types!  only a hack for testing widgets in the Narrative
+       for new GenomeAnnotation objects */
+    funcdef get_feature_info_hack_for_widget(GetFeatureInfoHack params)
+            returns (GetFeatureInfoHackResult res) authentication required;
 };
