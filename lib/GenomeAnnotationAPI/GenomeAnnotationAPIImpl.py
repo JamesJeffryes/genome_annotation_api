@@ -761,9 +761,9 @@ class GenomeAnnotationAPI:
         featureContainers = gaData['data']['feature_container_references']
         gaInfo = gaData['info']
 
+        print('get_feature_info_hack_for_widget() call on:')
         pprint(gaInfo)
-        pprint(featureContainers)
-
+        #pprint(featureContainers)
 
         # feature types filter
         types = None
