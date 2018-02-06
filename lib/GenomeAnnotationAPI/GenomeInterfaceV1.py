@@ -34,46 +34,74 @@ class GenomeInterfaceV1:
     #     boolean no_metadata;
     # } GetGenomeParamsV1;
     #
+    def _check_bool(self, params, key, default):
+        if key in params:
+            if not isinstance(params[key], bool) and params[key] not in {0, 1}:
+                raise ValueError(
+                    '{} input field must be a boolean'.format(key))
+            return params[key]
+        return default
+
     def get_genome(self, ctx, params):
 
         object_specifications = self.build_object_specifications(params)
 
         getObjParams = {'objects': object_specifications}
 
-        if 'ignoreErrors' in params:
-            if params['ignoreErrors']==0:
-                getObjParams['ignoreErrors']=0
-            elif params['ignoreErrors']==1:
-                getObjParams['ignoreErrors']=1
-            else:
-                raise ValueError('ignoreErrors input field must be set to 0 or 1')
-        else:
-            getObjParams['ignoreErrors']=0
+        getObjParams['no_data'] = self._check_bool(params, 'no_data', 0)
+        getObjParams['ignoreErrors'] = self._check_bool(params, 'ignoreErrors', 0)
+        downgrade = self._check_bool(params, 'downgrade', 1)
+        no_metadata = self._check_bool(params, 'no_metadata', 0)
 
-        if 'no_data' in params:
-            if params['no_data']==0:
-                getObjParams['no_data']=0
-            elif params['no_data']==1:
-                getObjParams['no_data']=1
-            else:
-                raise ValueError('no_data input field must be set to 0 or 1')
-        else:
-            getObjParams['no_data']=0
-
-        #self.validate_proper_ws_type(object_specifications, getObjParams['ignoreErrors'], 'KBaseGenomes.Genome')
+        self.validate_proper_ws_type(object_specifications, getObjParams['ignoreErrors'], 'Genome')
         data = self.ws.get_objects2(getObjParams)['data']
+        for i, genome in enumerate(data):
+            if downgrade:
+                data[i]['data'] = self.downgrade_genome(genome.get('data', {}))
 
-        if 'no_metadata' in params:
-            if params['no_metadata']==1:
-                d2 = []
-                for obj in data:
-                    d2.append({'data':obj['data']})
-                data = d2
+        if no_metadata:
+            data = [{'data': obj['data']} for obj in data]
 
-        returnPackage = { 'genomes':data }
+        returnPackage = {'genomes': data}
         return returnPackage
 
-    def build_object_specifications(self,params):
+    @staticmethod
+    def downgrade_genome(genome_data):
+        """This reverts a genome to an older style for back compatibility"""
+        print("Downgrading Genome for back compatibility")
+        feature_list = []
+        ont_present = genome_data.get('ontologies_present', {})
+        ont_ref = genome_data.get('ontology_events',
+                                  [{"ontology_ref": ""}])[0]['ontology_ref']
+        for feat_array in (('features', 'gene'), ('mrnas', 'mRNA'),
+                           ('cdss', 'CDS'), ('non_coding_features', 'gene')):
+            for feat in genome_data.get(feat_array[0], []):
+                if 'type' not in feat:
+                    feat['type'] = feat_array[1]
+                if feat.get("aliases") and isinstance(feat['aliases'][0], list):
+                    feat['aliases'] = [x[1] for x in feat['aliases']]
+                if feat.get('functions'):
+                    feat['function'] = "; ".join(feat['functions'])
+                for ont, terms in feat.get('ontology_terms', {}).items():
+                    for _id, term in terms.items():
+                        if "term_lineage" in feat['ontology_terms'][ont][_id]:
+                            continue  # don't change a properly styled feature
+                        feat['ontology_terms'][ont][_id] = {
+                            "evidence": [],
+                            "id": _id,
+                            "ontology_ref": ont_ref,
+                            "term_lineage": [],
+                            "term_name": ont_present.get(ont, {}).get(_id, "")
+                        }
+                feature_list.append(feat)
+
+            if feat_array[0] in genome_data:
+                del genome_data[feat_array[0]]
+
+        genome_data['features'] = feature_list
+        return genome_data
+
+    def build_object_specifications(self, params):
 
         if 'genomes' not in params:
             raise ValueError('Invalid input - "genomes" input argument field is missing.')
@@ -107,19 +135,24 @@ class GenomeInterfaceV1:
             ref_path_to_genome = []
             if 'ref_path_to_genome' in g:
                 ref_path_to_genome = g['ref_path_to_genome']
-            selector = self.create_base_object_spec(g['ref'],ref_path_to_genome)
+            selector = self.create_base_object_spec(g['ref'],
+                                                    ref_path_to_genome)
             included = included_fields
+            feature_array = 'features'
+            if g.get('feature_array'):
+                feature_array = g['feature_array']
 
             # if there are specific features selected, get those
-            if 'included_feature_position_index' in g and len(g['included_feature_position_index'])>0:
+            if len(g.get('included_feature_position_index', [])) > 0:
                 for pos in g['included_feature_position_index']:
-                    base = 'features/'+str(pos)
+                    base = feature_array+'/'+str(pos)
                     included_feature_paths = self.create_feature_selectors(base, included_feature_fields)
                     for p in included_feature_paths:
                         included.append(p)
             # no selected features, but if included_feature_fields is defined, do that
             elif len(included_feature_fields) >0:
-                included_feature_paths = self.create_feature_selectors('features/[*]', included_feature_fields)
+                base = feature_array + '/[*]'
+                included_feature_paths = self.create_feature_selectors(base, included_feature_fields)
                 for p in included_feature_paths:
                     included.append(p)
 
@@ -128,11 +161,12 @@ class GenomeInterfaceV1:
             object_specifications.append(selector)
         return object_specifications
 
-    def create_feature_selectors(self, base, included_feature_fields):
+    @staticmethod
+    def create_feature_selectors(base, included_feature_fields):
         included = []
-        if len(included_feature_fields)>0:
+        if len(included_feature_fields) > 0:
             for f in included_feature_fields:
-                included.append( base + '/' + f)
+                included.append(base + '/' + f)
         else:
             included = [base]
         return included
@@ -146,7 +180,7 @@ class GenomeInterfaceV1:
         # Make sure type name matches, no check for version yet!
         for i in info:
             if i is not None:
-                if i[2].split('-')[0] != type_name:
+                if i[2].split('-')[0].split('.')[1] != type_name:
                     raise ValueError('An input object reference is not a '+type_name+'. It was: '+i[2])
 
 
@@ -166,6 +200,7 @@ class GenomeInterfaceV1:
 
     def save_one_genome(self, ctx, params):
         """
+        DEPRICATED: use GenomeFileUtil.save_one_genome
         typedef structure {
             string workspace;
             string name;
@@ -238,11 +273,16 @@ class GenomeInterfaceV1:
                     except:
                         raise TypeError('Invalid closeness_measure value "{}": float expected'
                                         .format(closeness_measure))
+
+        # pegging this API to a specific, old version of the genome
+        old_genome_type = self.ws.translate_from_MD5_types(
+            ['KBaseGenomes.Genome-f6e83df5424e9e67c6185f1d21e07b50']).values()[0][0]
+
         save_params = {
             'objects': [{
                 'name': name,
                 'data': data,
-                'type': 'KBaseGenomes.Genome',
+                'type': old_genome_type,
                 'provenance': provenance,
                 'hidden': hidden
             }]
