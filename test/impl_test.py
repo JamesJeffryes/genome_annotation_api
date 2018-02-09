@@ -90,15 +90,11 @@ class GenomeAnnotationAPITests(unittest.TestCase):
         data = json.load(open('data/rhodobacter.json'))
         data['contigset_ref'] = contigset_ref
         # save to ws
-        save_info = {
+        info = cls.impl.save_one_genome_v1(cls.ctx, {
             'workspace': wsName,
-            'objects': [{
-                'type': 'KBaseGenomes.Genome',
-                'data': data,
-                'name': 'rhodobacter'
-            }]
-        }
-        info = cls.ws.save_objects(save_info)[0]
+            'name': "rhodobacter",
+            'data': data,
+        })[0]['info']
         cls.old_genome_ref = str(info[6]) + '/' + str(info[0]) + '/' + str(
             info[4])
         print('created old test genome')
@@ -118,7 +114,7 @@ class GenomeAnnotationAPITests(unittest.TestCase):
         save_info = {
             'workspace': wsName,
             'objects': [{
-                'type': 'NewTempGenomes.Genome',
+                'type': 'KBaseGenomes.Genome',
                 'data': data,
                 'name': 'new_ecoli'
             }]
